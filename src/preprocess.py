@@ -16,6 +16,6 @@ def prepare_dataset(df: pd.DataFrame, n_splits: int, seed: int) -> pd.DataFrame:
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
     for fold, (train_idx, valid_idx) in enumerate(skf.split(df['title'], df['label_group'], groups=df['label_group'])):
-        df.loc[train_idx, 'fold'] = fold
+        df.loc[valid_idx, 'fold'] = fold
     
     return df
