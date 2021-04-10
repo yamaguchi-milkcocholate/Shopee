@@ -76,7 +76,7 @@ class ArcMarginProduct(tf.keras.layers.Layer):
 
 
 # Function to build bert model
-def build_bert_model(bert_layer, n_classes, lr, max_len = 512):
+def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True):
     
     margin = ArcMarginProduct(
             n_classes = n_classes, 
@@ -96,7 +96,8 @@ def build_bert_model(bert_layer, n_classes, lr, max_len = 512):
     x = margin([clf_output, label])
     output = tf.keras.layers.Softmax(dtype='float32')(x)
     model = tf.keras.models.Model(inputs = [input_word_ids, input_mask, segment_ids, label], outputs = [output])
-    model.compile(optimizer = tf.keras.optimizers.Adam(lr = lr),
-                  loss = [tf.keras.losses.SparseCategoricalCrossentropy()],
-                  metrics = [tf.keras.metrics.SparseCategoricalAccuracy()])
+    if compile:
+        model.compile(optimizer = tf.keras.optimizers.Adam(lr = lr),
+                    loss = [tf.keras.losses.SparseCategoricalCrossentropy()],
+                    metrics = [tf.keras.metrics.SparseCategoricalAccuracy()])
     return model
