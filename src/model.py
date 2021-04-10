@@ -1,4 +1,5 @@
 import tensorflow as tf
+import efficientnet.tfkeras as efn
 import math
 
 
@@ -100,4 +101,34 @@ def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True):
         model.compile(optimizer = tf.keras.optimizers.Adam(lr = lr),
                     loss = [tf.keras.losses.SparseCategoricalCrossentropy()],
                     metrics = [tf.keras.metrics.SparseCategoricalAccuracy()])
+    return model
+
+
+def build_efficientnet_model(n_classes, image_size, lr, en_type='B0', train=True):
+    margin = ArcMarginProduct(
+        n_classes = n_classes, 
+        s = 30, 
+        m = 0.5, 
+        name='head/arc_margin', 
+        dtype='float32'
+    )
+
+    inp = tf.keras.layers.Input(shape = (*image_size, 3), name = 'inp1')
+    label = tf.keras.layers.Input(shape = (), name = 'inp2')
+    x = getattr(efn, f'EfficientNet{en_type}')(weights = 'imagenet', include_top = False)(inp)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = margin([x, label])
+
+    output = tf.keras.layers.Softmax(dtype='float32')(x)
+
+    model = tf.keras.models.Model(inputs = [inp, label], outputs = [output])
+
+    opt = tf.keras.optimizers.Adam(learning_rate = lr)
+
+    model.compile(
+        optimizer = opt,
+        loss = [tf.keras.losses.SparseCategoricalCrossentropy()],
+        metrics = [tf.keras.metrics.SparseCategoricalAccuracy()]
+    ) 
+
     return model
