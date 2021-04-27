@@ -59,7 +59,7 @@ def get_validation_dataset(filenames, config, data_augment, ordered = True):
     dataset = load_dataset(filenames, config.tf_expt, config.image_size, ordered = ordered)
     dataset = dataset.map(arcface_format, num_parallel_calls = config.tf_expt)
     dataset = dataset.batch(config.batch_size)
-    dataset = dataset.prefetch(config.tf_expt) 
+    dataset = dataset.prefetch(config.tf_expt)
     return dataset
 
 
