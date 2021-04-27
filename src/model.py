@@ -1,5 +1,6 @@
 import tensorflow as tf
 import efficientnet.tfkeras as efn
+from classification_models.keras import Classifiers
 import math
 
 
@@ -77,7 +78,7 @@ class ArcMarginProduct(tf.keras.layers.Layer):
 
 
 # Function to build bert model
-def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True):
+def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True, emb_len=None):
     
     margin = ArcMarginProduct(
             n_classes = n_classes, 
@@ -94,7 +95,11 @@ def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True):
 
     _, sequence_output = bert_layer([input_word_ids, input_mask, segment_ids])
     clf_output = sequence_output[:, 0, :]
-    x = margin([clf_output, label])
+    if emb_len is not None:
+        x = tf.keras.layers.Dropout(0.2)(clf_output)
+        x = tf.keras.layers.Dense(emb_len)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+    x = margin([x, label])
     output = tf.keras.layers.Softmax(dtype='float32')(x)
     model = tf.keras.models.Model(inputs = [input_word_ids, input_mask, segment_ids, label], outputs = [output])
     if compile:
@@ -104,7 +109,42 @@ def build_bert_model(bert_layer, n_classes, lr, max_len = 512, train=True):
     return model
 
 
-def build_efficientnet_model(n_classes, image_size, lr, en_type='B0', train=True):
+def build_resnext_model(n_classes, image_size, lr, train=True, emb_len=None):
+    margin = ArcMarginProduct(
+        n_classes = n_classes, 
+        s = 30, 
+        m = 0.5, 
+        name='head/arc_margin', 
+        dtype='float32'
+    )
+
+    inp = tf.keras.layers.Input(shape = (*image_size, 3), name = 'inp1')
+    label = tf.keras.layers.Input(shape = (), name = 'inp2')
+    ResNext, _ = Classifiers.get('resnext50')
+    x = ResNext(input_shape=(*image_size, 3), weights = 'imagenet', include_top = False)(inp)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    if emb_len is not None:
+        x = tf.keras.layers.Dropout(0.2)(x)
+        x = tf.keras.layers.Dense(emb_len)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+    x = margin([x, label])
+
+    output = tf.keras.layers.Softmax(dtype='float32')(x)
+
+    model = tf.keras.models.Model(inputs = [inp, label], outputs = [output])
+
+    opt = tf.keras.optimizers.Adam(learning_rate = lr)
+
+    model.compile(
+        optimizer = opt,
+        loss = [tf.keras.losses.SparseCategoricalCrossentropy()],
+        metrics = [tf.keras.metrics.SparseCategoricalAccuracy()]
+    ) 
+
+    return model
+
+
+def build_efficientnet_model(n_classes, image_size, lr, en_type='B0', train=True, emb_len=None):
     margin = ArcMarginProduct(
         n_classes = n_classes, 
         s = 30, 
@@ -117,6 +157,10 @@ def build_efficientnet_model(n_classes, image_size, lr, en_type='B0', train=True
     label = tf.keras.layers.Input(shape = (), name = 'inp2')
     x = getattr(efn, f'EfficientNet{en_type}')(weights = 'imagenet', include_top = False)(inp)
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    if emb_len is not None:
+        x = tf.keras.layers.Dropout(0.2)(x)
+        x = tf.keras.layers.Dense(emb_len)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
     x = margin([x, label])
 
     output = tf.keras.layers.Softmax(dtype='float32')(x)
